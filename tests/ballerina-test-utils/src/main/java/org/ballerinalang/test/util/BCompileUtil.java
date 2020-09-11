@@ -71,7 +71,6 @@ import static org.ballerinalang.compiler.CompilerOptionName.SKIP_MODULE_DEPENDEN
 import static org.ballerinalang.compiler.CompilerOptionName.SKIP_TESTS;
 import static org.ballerinalang.compiler.CompilerOptionName.TEST_ENABLED;
 import static org.ballerinalang.test.util.TestConstant.ENABLE_JBALLERINA_TESTS;
-import static org.ballerinalang.test.util.TestConstant.ENABLE_OLD_PARSER_FOR_TESTS;
 import static org.ballerinalang.test.util.TestConstant.MODULE_INIT_CLASS_NAME;
 import static org.wso2.ballerinalang.compiler.util.ProjectDirConstants.BALLERINA_HOME;
 import static org.wso2.ballerinalang.compiler.util.ProjectDirConstants.BALLERINA_HOME_LIB;
@@ -432,6 +431,8 @@ public class BCompileUtil {
         options.put(EXPERIMENTAL_FEATURES_ENABLED, Boolean.toString(enableExpFeatures));
         options.put(OFFLINE, "true");
 
+        options.put(NEW_PARSER_ENABLED, Boolean.TRUE.toString());
+
         return compile(context, packageName, compilerPhase, false);
     }
 
@@ -538,6 +539,8 @@ public class BCompileUtil {
         options.put(EXPERIMENTAL_FEATURES_ENABLED, Boolean.TRUE.toString());
         options.put(OFFLINE, "true");
 
+        options.put(NEW_PARSER_ENABLED, Boolean.TRUE.toString());
+
         CompileResult.CompileResultDiagnosticListener listener = new CompileResult.CompileResultDiagnosticListener();
         context.put(DiagnosticListener.class, listener);
 
@@ -588,10 +591,6 @@ public class BCompileUtil {
         return Boolean.parseBoolean(value);
     }
 
-    public static boolean newParserEnabled() {
-        return !Boolean.parseBoolean(System.getProperty(ENABLE_OLD_PARSER_FOR_TESTS));
-    }
-
     private static CompileResult compileOnJBallerina(String sourceRoot, String packageName,
                                                      SourceDirectory sourceDirectory, boolean init, boolean withTests) {
 
@@ -618,8 +617,8 @@ public class BCompileUtil {
         return compileOnJBallerina(context, sourceRoot, packageName, temp, init, false, false);
     }
 
-    private static CompileResult compileOnJBallerina(CompilerContext context, String sourceRoot, String packageName,
-                                                     boolean temp, boolean init, boolean withTests) {
+    public static CompileResult compileOnJBallerina(CompilerContext context, String sourceRoot, String packageName,
+                                                    boolean temp, boolean init, boolean withTests) {
 
         return compileOnJBallerina(context, sourceRoot, packageName, temp, init, false, withTests);
     }
@@ -644,13 +643,12 @@ public class BCompileUtil {
         URLClassLoader classLoader = compileResult.classLoader;
 
         try {
-            Class<?> initClazz = classLoader.loadClass(initClassName);
             final List<String> actualArgs = new ArrayList<>();
             actualArgs.add(0, "java");
             actualArgs.add(1, "-cp");
             String classPath = System.getProperty("java.class.path") + ":" + getClassPath(classLoader);
             actualArgs.add(2, classPath);
-            actualArgs.add(3, initClazz.getCanonicalName());
+            actualArgs.add(3, initClassName);
             actualArgs.addAll(Arrays.asList(args));
 
             final Runtime runtime = Runtime.getRuntime();
@@ -660,7 +658,7 @@ public class BCompileUtil {
             process.waitFor();
             int exitValue = process.exitValue();
             return new ExitDetails(exitValue, consoleInput, consoleError);
-        } catch (ClassNotFoundException | InterruptedException | IOException e) {
+        } catch (InterruptedException | IOException e) {
             throw new RuntimeException("Main method invocation failed", e);
         }
     }
@@ -723,9 +721,7 @@ public class BCompileUtil {
                 options.put(TEST_ENABLED, Boolean.TRUE.toString());
             }
 
-            if (newParserEnabled()) {
-                options.put(NEW_PARSER_ENABLED, Boolean.TRUE.toString());
-            }
+            options.put(NEW_PARSER_ENABLED, Boolean.TRUE.toString());
 
             CompileResult compileResult = compile(context, packageName, CompilerPhase.CODE_GEN, withTests);
             if (compileResult.getErrorCount() > 0) {

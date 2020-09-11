@@ -15,12 +15,13 @@
  */
 package org.ballerinalang.langserver.common.utils;
 
-import com.google.common.collect.Lists;
-import org.antlr.v4.runtime.ANTLRInputStream;
-import org.antlr.v4.runtime.CommonToken;
-import org.antlr.v4.runtime.CommonTokenStream;
-import org.antlr.v4.runtime.Token;
-import org.antlr.v4.runtime.TokenStream;
+import io.ballerinalang.compiler.syntax.tree.FunctionCallExpressionNode;
+import io.ballerinalang.compiler.syntax.tree.NameReferenceNode;
+import io.ballerinalang.compiler.syntax.tree.Node;
+import io.ballerinalang.compiler.syntax.tree.NonTerminalNode;
+import io.ballerinalang.compiler.syntax.tree.QualifiedNameReferenceNode;
+import io.ballerinalang.compiler.syntax.tree.SimpleNameReferenceNode;
+import io.ballerinalang.compiler.syntax.tree.SyntaxKind;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.SystemUtils;
 import org.apache.commons.lang3.tuple.ImmutablePair;
@@ -29,6 +30,7 @@ import org.ballerinalang.jvm.util.BLangConstants;
 import org.ballerinalang.langserver.common.CommonKeys;
 import org.ballerinalang.langserver.common.ImportsAcceptor;
 import org.ballerinalang.langserver.commons.LSContext;
+import org.ballerinalang.langserver.commons.completion.CompletionKeys;
 import org.ballerinalang.langserver.commons.completion.LSCompletionItem;
 import org.ballerinalang.langserver.compiler.DocumentServiceKeys;
 import org.ballerinalang.langserver.compiler.common.modal.BallerinaPackage;
@@ -53,17 +55,17 @@ import org.eclipse.lsp4j.Range;
 import org.eclipse.lsp4j.TextEdit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.wso2.ballerinalang.compiler.parser.antlr4.BallerinaLexer;
-import org.wso2.ballerinalang.compiler.parser.antlr4.BallerinaParser;
 import org.wso2.ballerinalang.compiler.semantics.model.Scope;
 import org.wso2.ballerinalang.compiler.semantics.model.SymbolEnv;
 import org.wso2.ballerinalang.compiler.semantics.model.SymbolTable;
 import org.wso2.ballerinalang.compiler.semantics.model.symbols.BAnnotationSymbol;
+import org.wso2.ballerinalang.compiler.semantics.model.symbols.BConstructorSymbol;
 import org.wso2.ballerinalang.compiler.semantics.model.symbols.BInvokableSymbol;
 import org.wso2.ballerinalang.compiler.semantics.model.symbols.BObjectTypeSymbol;
 import org.wso2.ballerinalang.compiler.semantics.model.symbols.BOperatorSymbol;
 import org.wso2.ballerinalang.compiler.semantics.model.symbols.BPackageSymbol;
 import org.wso2.ballerinalang.compiler.semantics.model.symbols.BSymbol;
+import org.wso2.ballerinalang.compiler.semantics.model.symbols.BTypeSymbol;
 import org.wso2.ballerinalang.compiler.semantics.model.types.BArrayType;
 import org.wso2.ballerinalang.compiler.semantics.model.types.BErrorType;
 import org.wso2.ballerinalang.compiler.semantics.model.types.BField;
@@ -91,6 +93,7 @@ import org.wso2.ballerinalang.compiler.tree.expressions.BLangInvocation;
 import org.wso2.ballerinalang.compiler.tree.statements.BLangSimpleVariableDef;
 import org.wso2.ballerinalang.compiler.util.CompilerContext;
 import org.wso2.ballerinalang.compiler.util.Name;
+import org.wso2.ballerinalang.compiler.util.Names;
 import org.wso2.ballerinalang.compiler.util.diagnotic.DiagnosticPos;
 import org.wso2.ballerinalang.util.Flags;
 
@@ -163,17 +166,6 @@ public class CommonUtil {
     }
 
     /**
-     * Calculate the user defined type position.
-     *
-     * @param position position of the node
-     * @param name     name of the user defined type
-     * @param pkgAlias package alias name of the user defined type
-     */
-    public static void calculateEndColumnOfGivenName(DiagnosticPos position, String name, String pkgAlias) {
-        position.eCol = position.sCol + name.length() + (!pkgAlias.isEmpty() ? (pkgAlias + ":").length() : 0);
-    }
-
-    /**
      * Convert the diagnostic position to a zero based positioning diagnostic position.
      *
      * @param diagnosticPos - diagnostic position to be cloned
@@ -202,68 +194,6 @@ public class CommonUtil {
     }
 
     /**
-     * Get the previous default token from the given start index.
-     *
-     * @param tokenStream Token Stream
-     * @param startIndex  Start token index
-     * @return {@link Optional}      Previous default token
-     */
-    public static Optional<Token> getPreviousDefaultToken(TokenStream tokenStream, int startIndex) {
-        return getDefaultTokenToLeftOrRight(tokenStream, startIndex, -1);
-    }
-
-    /**
-     * Get the next default token from the given start index.
-     *
-     * @param tokenStream Token Stream
-     * @param startIndex  Start token index
-     * @return {@link Optional}      Previous default token
-     */
-    public static Optional<Token> getNextDefaultToken(TokenStream tokenStream, int startIndex) {
-        return getDefaultTokenToLeftOrRight(tokenStream, startIndex, 1);
-    }
-
-    /**
-     * Get n number of default tokens from a given start index.
-     *
-     * @param tokenStream Token Stream
-     * @param n           number of tokens to extract
-     * @param startIndex  Start token index
-     * @return {@link List}     List of tokens extracted
-     */
-    public static List<Token> getNDefaultTokensToLeft(TokenStream tokenStream, int n, int startIndex) {
-        List<Token> tokens = new ArrayList<>();
-        Optional<Token> token;
-        while (n > 0) {
-            token = getDefaultTokenToLeftOrRight(tokenStream, startIndex, -1);
-            if (!token.isPresent()) {
-                return new ArrayList<>();
-            }
-            tokens.add(token.get());
-            n--;
-            startIndex = token.get().getTokenIndex();
-        }
-
-        return Lists.reverse(tokens);
-    }
-
-    private static Optional<Token> getDefaultTokenToLeftOrRight(TokenStream tokenStream, int startIndex,
-                                                                int direction) {
-        Token token = null;
-        while (true) {
-            startIndex += direction;
-            if (startIndex < 0 || startIndex == tokenStream.size()) {
-                break;
-            }
-            token = tokenStream.get(startIndex);
-            if (token.getChannel() == Token.DEFAULT_CHANNEL) {
-                break;
-            }
-        }
-        return Optional.ofNullable(token);
-    }
-
-    /**
      * Get the Annotation completion Item.
      *
      * @param packageID        Package Id
@@ -273,7 +203,7 @@ public class CommonUtil {
      * @return {@link LSCompletionItem} Completion item for the annotation
      */
     public static LSCompletionItem getAnnotationCompletionItem(PackageID packageID, BAnnotationSymbol annotationSymbol,
-                                                               LSContext ctx, CommonToken pkgAlias,
+                                                               LSContext ctx, String pkgAlias,
                                                                Map<String, String> pkgAliasMap) {
         PackageID currentPkgID = ctx.get(DocumentServiceKeys.CURRENT_PACKAGE_ID_KEY);
         String currentProjectOrgName = currentPkgID == null ? "" : currentPkgID.orgName.value;
@@ -318,7 +248,7 @@ public class CommonUtil {
         // if the particular import statement not available we add the additional text edit to auto import
         if (!pkgImport.isPresent() && !isLangLib(packageID)) {
             annotationItem.setAdditionalTextEdits(getAutoImportTextEdits(packageID.orgName.getValue(),
-                                                                         packageID.name.getValue(), ctx));
+                    packageID.name.getValue(), ctx));
         }
         return new SymbolCompletionItem(ctx, annotationSymbol, annotationItem);
     }
@@ -569,12 +499,12 @@ public class CommonUtil {
         completionItem.setKind(CompletionItemKind.Property);
         completionItem.setSortText(Priority.PRIORITY110.toString());
 
-        return new StaticCompletionItem(context, completionItem);
+        return new StaticCompletionItem(context, completionItem, StaticCompletionItem.Kind.OTHER);
     }
 
     /**
      * Get the completion Item for the error type.
-     * 
+     *
      * @param context LS Operation context
      * @return {@link LSCompletionItem} generated for error type
      */
@@ -585,8 +515,8 @@ public class CommonUtil {
         errorTypeCItem.setDetail(ItemResolverConstants.ERROR);
         errorTypeCItem.setInsertTextFormat(InsertTextFormat.Snippet);
         errorTypeCItem.setKind(CompletionItemKind.Event);
-        
-        return new StaticCompletionItem(context, errorTypeCItem);
+
+        return new StaticCompletionItem(context, errorTypeCItem, StaticCompletionItem.Kind.TYPE);
     }
 
     /**
@@ -629,6 +559,56 @@ public class CommonUtil {
         String nameValue = bSymbol.name.getValue();
         String[] split = nameValue.split("\\.");
         return split[split.length - 1];
+    }
+
+    /**
+     * Predicate to check whether a scope entry is a BType or not.
+     *
+     * @return {@link Predicate} for BType check
+     */
+    public static Predicate<Scope.ScopeEntry> isBType() {
+        return entry -> entry.symbol instanceof BTypeSymbol
+                || (entry.symbol instanceof BConstructorSymbol
+                && Names.ERROR.equals(entry.symbol.name));
+    }
+
+    /**
+     * Filter a type in the module by the name.
+     *
+     * @param context  language server operation context
+     * @param alias    module alias
+     * @param typeName type name to be filtered against
+     * @return {@link Optional} type found
+     */
+    public static Optional<Scope.ScopeEntry> getTypeFromModule(LSContext context, String alias, String typeName) {
+        Optional<Scope.ScopeEntry> module = CommonUtil.packageSymbolFromAlias(context, alias);
+        return module.flatMap(scopeEntry -> scopeEntry.symbol.scope.entries.values().stream()
+                .filter(isBType()
+                        .and(entry -> getBTypeName(entry.symbol.type, context, false).equals(alias + ":" + typeName)))
+                .findAny());
+    }
+
+    /**
+     * Get the module symbol associated with the given alias.
+     *
+     * @param context Language server operation context
+     * @param alias   alias value
+     * @return {@link Optional} scope entry for the module symbol
+     */
+    public static Optional<Scope.ScopeEntry> packageSymbolFromAlias(LSContext context, String alias) {
+        List<Scope.ScopeEntry> visibleSymbols = new ArrayList<>(context.get(CommonKeys.VISIBLE_SYMBOLS_KEY));
+        Optional<BLangImportPackage> pkgForAlias = context.get(DocumentServiceKeys.CURRENT_DOC_IMPORTS_KEY).stream()
+                .filter(pkg -> pkg.alias.value.equals(alias))
+                .findAny();
+        if (alias.isEmpty() || !pkgForAlias.isPresent()) {
+            return Optional.empty();
+        }
+        return visibleSymbols.stream()
+                .filter(scopeEntry -> {
+                    BSymbol symbol = scopeEntry.symbol;
+                    return symbol == pkgForAlias.get().symbol;
+                })
+                .findAny();
     }
 
     private static String getShallowBTypeName(BType bType, LSContext ctx) {
@@ -717,7 +697,7 @@ public class CommonUtil {
     private static String getArrayTypeName(BArrayType arrayType, LSContext ctx, boolean doSimplify) {
         return getBTypeName(arrayType.eType, ctx, doSimplify) + "[]";
     }
-    
+
     private static boolean isLangLib(PackageID packageID) {
         return packageID.getOrgName().getValue().equals("ballerina")
                 && packageID.getName().getValue().startsWith("lang.");
@@ -876,8 +856,8 @@ public class CommonUtil {
         String relativeFilePath = ctx.get(DocumentServiceKeys.RELATIVE_FILE_PATH_KEY);
         BLangCompilationUnit filteredCUnit = pkgNode.compUnits.stream()
                 .filter(cUnit ->
-                                cUnit.getPosition().getSource().cUnitName.replace("/", FILE_SEPARATOR)
-                                        .equals(relativeFilePath))
+                        cUnit.getPosition().getSource().cUnitName.replace("/", FILE_SEPARATOR)
+                                .equals(relativeFilePath))
                 .findAny().orElse(null);
         List<TopLevelNode> topLevelNodes = filteredCUnit == null
                 ? new ArrayList<>()
@@ -903,38 +883,6 @@ public class CommonUtil {
         return importPackage.pkgNameComps.stream()
                 .map(id -> id.value)
                 .collect(Collectors.joining("."));
-    }
-
-    /**
-     * Convert the Snippet to a plain text snippet by removing the place holders.
-     *
-     * @param snippet Snippet string to alter
-     * @return {@link String}   Converted Snippet
-     */
-    public static String getPlainTextSnippet(String snippet) {
-        return snippet
-                .replaceAll("\\$\\{\\d+:([^\\{^\\}]*)\\}", "$1")
-                .replaceAll("(\\$\\{\\d+\\})", "");
-    }
-
-    public static BallerinaParser prepareParser(String content) {
-        CommonTokenStream commonTokenStream = getTokenStream(content);
-        BallerinaParser parser = new BallerinaParser(commonTokenStream);
-        parser.removeErrorListeners();
-        return parser;
-    }
-
-    static CommonTokenStream getTokenStream(String content) {
-        ANTLRInputStream inputStream = new ANTLRInputStream(content);
-        BallerinaLexer lexer = new BallerinaLexer(inputStream);
-        lexer.removeErrorListeners();
-        return new CommonTokenStream(lexer);
-    }
-
-    public static List<Token> getTokenList(String content) {
-        CommonTokenStream tokenStream = getTokenStream(content);
-        tokenStream.fill();
-        return new ArrayList<>(tokenStream.getTokens());
     }
 
     public static boolean symbolContainsInvalidChars(BSymbol bSymbol) {
@@ -1006,6 +954,67 @@ public class CommonUtil {
 
         return new ImmutablePair<>(insertText.toString(), signature.toString());
     }
+
+    /**
+     * Get the expression entry, given the node.
+     *
+     * @param context        language server context
+     * @param expressionNode expression node
+     * @return {@link Optional} scope entry for the node
+     */
+    public static Optional<Scope.ScopeEntry> getExpressionEntry(LSContext context, Node expressionNode) {
+        List<Scope.ScopeEntry> visibleSymbols = context.get(CommonKeys.VISIBLE_SYMBOLS_KEY);
+
+        switch (expressionNode.kind()) {
+            case SIMPLE_NAME_REFERENCE:
+                String nameRef = ((SimpleNameReferenceNode) expressionNode).name().text();
+                return visibleSymbols.stream()
+                        .filter(scopeEntry -> scopeEntry.symbol.name.getValue().equals(nameRef))
+                        .findAny();
+            case FUNCTION_CALL:
+                NameReferenceNode refName = ((FunctionCallExpressionNode) expressionNode).functionName();
+                if (refName.kind() == SyntaxKind.QUALIFIED_NAME_REFERENCE) {
+                    String alias = ((QualifiedNameReferenceNode) refName).modulePrefix().text();
+                    String fName = ((QualifiedNameReferenceNode) refName).identifier().text();
+
+                    Optional<Scope.ScopeEntry> moduleEntry = CommonUtil.packageSymbolFromAlias(context, alias);
+                    if (!moduleEntry.isPresent()) {
+                        return Optional.empty();
+                    }
+                    BPackageSymbol pkgSymbol = (BPackageSymbol) moduleEntry.get().symbol;
+                    return pkgSymbol.scope.entries.values().stream()
+                            .filter(scopeEntry -> scopeEntry.symbol instanceof BInvokableSymbol
+                                    && scopeEntry.symbol.getName().getValue().equals(fName))
+                            .findAny();
+                } else if (refName.kind() == SyntaxKind.SIMPLE_NAME_REFERENCE) {
+                    String funcName = ((SimpleNameReferenceNode) refName).name().text();
+                    return visibleSymbols.stream()
+                            .filter(scopeEntry -> scopeEntry.symbol instanceof BInvokableSymbol
+                                    && scopeEntry.symbol.name.getValue().equals(funcName))
+                            .findAny();
+                }
+                break;
+            default:
+                break;
+        }
+
+        return Optional.empty();
+    }
+
+    /**
+     * Get the type of the given symbol.
+     *
+     * @param symbol symbol to evaluate
+     * @return {@link BType} of the symbol
+     */
+    public static BType getTypeOfSymbol(BSymbol symbol) {
+        if (symbol instanceof BInvokableSymbol) {
+            return ((BInvokableSymbol) symbol).getReturnType();
+        }
+
+        return symbol.type;
+    }
+
 
     /**
      * Get visible worker symbols from context.
@@ -1301,6 +1310,10 @@ public class CommonUtil {
          */
         @Override
         public int compare(BLangNode node1, BLangNode node2) {
+            // TODO: Fix?
+            if (node1.getPosition() == null || node2.getPosition() == null) {
+                return -1;
+            }
             return node1.getPosition().getStartLine() - node2.getPosition().getStartLine();
         }
     }
@@ -1310,12 +1323,13 @@ public class CommonUtil {
      * When showing a lang lib invokable symbol over DOT(invocation) we do not show the first param, but when we
      * showing the invocation over package of the langlib with the COLON we show the first param
      *
+     * @param context         context
      * @param invokableSymbol invokable symbol
-     * @param invocationType  delimiter
      * @return {@link Boolean} whether we show the first param or not
      */
-    public static boolean skipFirstParam(BInvokableSymbol invokableSymbol, int invocationType) {
-        return isLangLibSymbol(invokableSymbol) && invocationType != BallerinaParser.COLON;
+    public static boolean skipFirstParam(LSContext context, BInvokableSymbol invokableSymbol) {
+        NonTerminalNode nodeAtCursor = context.get(CompletionKeys.NODE_AT_CURSOR_KEY);
+        return isLangLibSymbol(invokableSymbol) && nodeAtCursor.kind() != SyntaxKind.QUALIFIED_NAME_REFERENCE;
     }
 
     /**

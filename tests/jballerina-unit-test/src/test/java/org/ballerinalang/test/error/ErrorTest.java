@@ -145,9 +145,9 @@ public class ErrorTest {
         String message = ((BLangRuntimeException) expectedException).getMessage();
 
         Assert.assertEquals(message,
-                "error: largeNumber message=large number\n\t" +
-                        "at error_test:errorPanicCallee(error_test.bal:37)\n\t" +
-                        "   error_test:errorPanicTest(error_test.bal:31)");
+                "error: largeNumber {\"message\":\"large number\"}\n" +
+                        "\tat error_test:errorPanicCallee(error_test.bal:37)\n" +
+                        "\t   error_test:errorPanicTest(error_test.bal:31)");
     }
 
     @Test
@@ -184,7 +184,7 @@ public class ErrorTest {
         Assert.assertEquals(returns[0].stringValue(), "test");
     }
 
-    @Test(groups = { "brokenOnNewParser", "disableOnOldParser" })
+    @Test(groups = { "disableOnOldParser" })
     public void testGetCallStack() {
         BValue[] returns = BRunUtil.invoke(errorTestResult, "getCallStackTest");
         Assert.assertEquals(returns[0].stringValue(), "{callableName:\"getCallStack\", " +
@@ -351,7 +351,7 @@ public class ErrorTest {
         Assert.assertEquals(returns[0].stringValue(), "Foo {message:\"error msg\"}");
     }
 
-    @Test(groups = { "brokenOnNewParser", "disableOnOldParser" })
+    @Test(groups = { "disableOnOldParser" })
     public void testStackTraceInNative() {
         Exception expectedException = null;
         try {
@@ -381,7 +381,8 @@ public class ErrorTest {
         BRunUtil.invoke(errorTestResult, "testPanicOnErrorUnion", args);
     }
 
-    @Test(expectedExceptions = BLangRuntimeException.class, expectedExceptionsMessageRegExp = "error: y code=4.*")
+    @Test(expectedExceptions = BLangRuntimeException.class, expectedExceptionsMessageRegExp = "error: y " +
+            "\\{\"code\":4\\}.*")
     public void testPanicOnErrorUnionCustomError2() {
         BValue[] args = new BValue[] { new BInteger(2) };
         BRunUtil.invoke(errorTestResult, "testPanicOnErrorUnion", args);

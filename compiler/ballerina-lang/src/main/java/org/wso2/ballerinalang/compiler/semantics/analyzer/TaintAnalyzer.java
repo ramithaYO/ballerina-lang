@@ -40,8 +40,8 @@ import org.wso2.ballerinalang.compiler.semantics.model.types.BType;
 import org.wso2.ballerinalang.compiler.tree.BLangAnnotation;
 import org.wso2.ballerinalang.compiler.tree.BLangAnnotationAttachment;
 import org.wso2.ballerinalang.compiler.tree.BLangBlockFunctionBody;
+import org.wso2.ballerinalang.compiler.tree.BLangClassDefinition;
 import org.wso2.ballerinalang.compiler.tree.BLangCompilationUnit;
-import org.wso2.ballerinalang.compiler.tree.BLangEndpoint;
 import org.wso2.ballerinalang.compiler.tree.BLangErrorVariable;
 import org.wso2.ballerinalang.compiler.tree.BLangExprFunctionBody;
 import org.wso2.ballerinalang.compiler.tree.BLangExternalFunctionBody;
@@ -61,6 +61,7 @@ import org.wso2.ballerinalang.compiler.tree.BLangTypeDefinition;
 import org.wso2.ballerinalang.compiler.tree.BLangVariable;
 import org.wso2.ballerinalang.compiler.tree.BLangWorker;
 import org.wso2.ballerinalang.compiler.tree.BLangXMLNS;
+import org.wso2.ballerinalang.compiler.tree.clauses.BLangInputClause;
 import org.wso2.ballerinalang.compiler.tree.expressions.BLangAccessExpression;
 import org.wso2.ballerinalang.compiler.tree.expressions.BLangAnnotAccessExpr;
 import org.wso2.ballerinalang.compiler.tree.expressions.BLangArrowFunction;
@@ -353,6 +354,17 @@ public class TaintAnalyzer extends BLangNodeVisitor {
     }
 
     @Override
+    public void visit(BLangClassDefinition classDefinition) {
+        BSymbol objectSymbol = classDefinition.symbol;
+        SymbolEnv classDefEnv = SymbolEnv.createPkgLevelSymbolEnv(classDefinition, objectSymbol.scope, env);
+        classDefinition.fields.forEach(field -> analyzeNode(field, classDefEnv));
+        if (classDefinition.initFunction != null) {
+            analyzeNode(classDefinition.initFunction, classDefEnv);
+        }
+        classDefinition.functions.forEach(f -> analyzeNode(f, classDefEnv));
+    }
+
+    @Override
     public void visit(BLangImportPackage importPkgNode) {
         BPackageSymbol pkgSymbol = importPkgNode.symbol;
         SymbolEnv pkgEnv = symTable.pkgEnvMap.get(pkgSymbol);
@@ -441,7 +453,7 @@ public class TaintAnalyzer extends BLangNodeVisitor {
         // of listeners.
         if (serviceNode.isAnonymousServiceValue) {
             setTaintedStatus(serviceNode.symbol, TaintedStatus.TAINTED);
-            setTaintedStatus(serviceNode.serviceTypeDefinition.symbol, TaintedStatus.TAINTED);
+            setTaintedStatus(serviceNode.serviceClass.symbol, TaintedStatus.TAINTED);
         }
     }
 
@@ -551,11 +563,6 @@ public class TaintAnalyzer extends BLangNodeVisitor {
     @Override
     public void visit(BLangWorker workerNode) {
         /* ignore, remove later */
-    }
-
-    @Override
-    public void visit(BLangEndpoint endpoint) {
-        /* ignore */
     }
 
     @Override
@@ -1634,7 +1641,17 @@ public class TaintAnalyzer extends BLangNodeVisitor {
 
     @Override
     public void visit(BLangQueryExpr queryExpr) {
-        /* ignore */
+        BLangInputClause inputClause = (BLangInputClause) queryExpr.getQueryClauses().get(0);
+        for (BLangNode clause : queryExpr.getQueryClauses()) {
+            if (clause.getKind() == NodeKind.FROM || clause.getKind() == NodeKind.JOIN) {
+                inputClause  = (BLangInputClause) clause;
+            }
+            ((BLangExpression) inputClause.getCollection()).accept(this);
+            if (getCurrentAnalysisState().taintedStatus == TaintedStatus.TAINTED) {
+                setTaintedStatus((BLangVariable) inputClause.variableDefinitionNode.getVariable(),
+                        getCurrentAnalysisState().taintedStatus);
+            }
+        }
     }
 
     @Override
@@ -2476,10 +2493,19 @@ public class TaintAnalyzer extends BLangNodeVisitor {
             if (getCurrentAnalysisState().taintedStatus == TaintedStatus.IGNORED) {
                 return;
             } else if (getCurrentAnalysisState().taintedStatus == TaintedStatus.TAINTED) {
-                returnTaintedStatus = TaintedStatus.TAINTED;
+                returnTaintedStatus = getTaintedStatusOfReceiverParam(invokableSymbol);
             }
         }
         getCurrentAnalysisState().taintedStatus = returnTaintedStatus;
+    }
+
+    private TaintedStatus getTaintedStatusOfReceiverParam(BInvokableSymbol invokableSymbol) {
+        TaintRecord taintRecordOfReceiverParam = invokableSymbol.taintTable.get(0);
+        if (taintRecordOfReceiverParam == null) {
+            return TaintedStatus.TAINTED;
+        } else {
+            return taintRecordOfReceiverParam.returnTaintedStatus;
+        }
     }
 
     private boolean restoreTableIfIgnored(BInvokableSymbol invokableSymbol, Map<Integer, TaintRecord> origTaintTable,

@@ -13,69 +13,114 @@
 // KIND, either express or implied.  See the License for the
 // specific language governing permissions and limitations
 // under the License.
+import ballerina/lang.__internal as internal;
 import ballerina/lang.'xml;
 
-public function createPipeline(
+function createPipeline(
         (Type)[]|map<Type>|record{}|string|xml|table<map<Type>>|stream<Type, error?>|_Iterable collection,
         typedesc<Type> resType)
             returns _StreamPipeline {
     return new _StreamPipeline(collection, resType);
 }
 
-public function createInputFunction(function(_Frame _frame) returns _Frame|error? inputFunc)
+function createInputFunction(function(_Frame _frame) returns _Frame|error? inputFunc)
         returns _StreamFunction {
     return new _InputFunction(inputFunc);
 }
 
-public function createNestedFromFunction(function(_Frame _frame) returns any|error? collectionFunc)
+function createNestedFromFunction(function(_Frame _frame) returns any|error? collectionFunc)
         returns _StreamFunction {
     return new _NestedFromFunction(collectionFunc);
 }
 
-public function createLetFunction(function(_Frame _frame) returns _Frame|error? letFunc)
+function createLetFunction(function(_Frame _frame) returns _Frame|error? letFunc)
         returns _StreamFunction {
     return new _LetFunction(letFunc);
 }
 
-public function createInnerJoinFunction(_StreamPipeline joinedPipeline,
-                                        function(_Frame _frame) returns boolean onCondition)
-        returns _StreamFunction {
-    return new _InnerJoinFunction(joinedPipeline, onCondition);
+function createInnerJoinFunction(
+        _StreamPipeline joinedPipeline,
+        function (_Frame _frame) returns any lhsKeyFunction,
+        function (_Frame _frame) returns any rhsKeyFunction) returns _StreamFunction {
+    return new _InnerJoinFunction(joinedPipeline, lhsKeyFunction, rhsKeyFunction);
 }
 
-public function createOuterJoinFunction(_StreamPipeline joinedPipeline,
-                                        function(_Frame _frame) returns boolean onCondition)
-        returns _StreamFunction {
-    return new _OuterJoinFunction(joinedPipeline, onCondition);
+function createOuterJoinFunction(
+        _StreamPipeline joinedPipeline,
+        function (_Frame _frame) returns any lhsKeyFunction,
+        function (_Frame _frame) returns any rhsKeyFunction, _Frame nilFrame) returns _StreamFunction {
+    return new _OuterJoinFunction(joinedPipeline, lhsKeyFunction, rhsKeyFunction, nilFrame);
 }
 
-public function createFilterFunction(function(_Frame _frame) returns boolean filterFunc)
+function createFilterFunction(function(_Frame _frame) returns boolean filterFunc)
         returns _StreamFunction {
     return new _FilterFunction(filterFunc);
 }
 
-public function createSelectFunction(function(_Frame _frame) returns _Frame|error? selectFunc)
+function createOrderByFunction(function(_Frame _frame) orderFunc)
+        returns _StreamFunction {
+    return new _OrderByFunction(orderFunc);
+}
+
+function createSelectFunction(function(_Frame _frame) returns _Frame|error? selectFunc)
         returns _StreamFunction {
     return new _SelectFunction(selectFunc);
 }
 
-public function createDoFunction(function(_Frame _frame) doFunc) returns _StreamFunction {
+function createDoFunction(function(_Frame _frame) doFunc) returns _StreamFunction {
     return new _DoFunction(doFunc);
 }
 
-public function createLimitFunction(int lmt) returns _StreamFunction {
-    return new _LimitFunction(lmt);
+function createLimitFunction(function (_Frame _frame) returns int limitFunction) returns _StreamFunction {
+    return new _LimitFunction(limitFunction);
 }
 
-public function addStreamFunction(@tainted _StreamPipeline pipeline, @tainted _StreamFunction streamFunction) {
+function addStreamFunction(@tainted _StreamPipeline pipeline, @tainted _StreamFunction streamFunction) {
     pipeline.addStreamFunction(streamFunction);
 }
 
-public function getStreamFromPipeline(_StreamPipeline pipeline) returns stream<Type, error?> {
+function getStreamFromPipeline(_StreamPipeline pipeline) returns stream<Type, error?> {
     return pipeline.getStream();
 }
 
-public function toArray(stream<Type, error?> strm, Type[] arr) returns Type[]|error {
+function sortStream(stream<Type, error?> strm, @tainted Type[] arr, int lmt) returns stream<Type, error?> {
+    Type[] streamValArr = [];
+    record {| Type value; |}|error? v = strm.next();
+    while (v is record {| Type value; |}) {
+        streamValArr.push(v.value);
+        v = strm.next();
+    }
+
+    StreamOrderBy streamOrderByObj = new StreamOrderBy();
+    var sortedArr = <@untainted>streamOrderByObj.topDownMergeSort();
+
+    int i = 0;
+    int k = 0;
+    // Add the sorted stream values to arr
+    foreach var e in sortedArr {
+        if (!(lmt == 0) && (k == lmt)) {
+            break;
+        }
+        int j = 0;
+        while (j < streamValArr.length()) {
+            if (e is anydata[]) {
+                if (streamValArr[j] is map<anydata>|string|xml) {
+                    if (e[e.length()-1] == <map<anydata>|string|xml>streamValArr[j]) {
+                        arr[i] = streamValArr[j];
+                        var val = streamValArr.remove(j);
+                        i += 1;
+                    }
+                }
+            }
+            j += 1;
+        }
+        k += 1;
+    }
+
+    return arr.toStream();
+}
+
+function toArray(stream<Type, error?> strm, Type[] arr) returns Type[]|error {
     record {| Type value; |}|error? v = strm.next();
     while (v is record {| Type value; |}) {
         arr.push(v.value);
@@ -84,10 +129,11 @@ public function toArray(stream<Type, error?> strm, Type[] arr) returns Type[]|er
     if (v is error) {
         return v;
     }
+
     return arr;
 }
 
-public function toXML(stream<Type, error?> strm) returns xml {
+function toXML(stream<Type, error?> strm) returns xml {
     xml result = 'xml:concat();
     record {| Type value; |}|error? v = strm.next();
     while (v is record {| Type value; |}) {
@@ -100,7 +146,7 @@ public function toXML(stream<Type, error?> strm) returns xml {
     return result;
 }
 
-public function toString(stream<Type, error?> strm) returns string {
+function toString(stream<Type, error?> strm) returns string {
     string result = "";
     record {| Type value; |}|error? v = strm.next();
     while (v is record {| Type value; |}) {
@@ -113,7 +159,7 @@ public function toString(stream<Type, error?> strm) returns string {
     return result;
 }
 
-public function addToTable(stream<Type, error?> strm, table<map<Type>> tbl, error? err) returns table<map<Type>>|error {
+function addToTable(stream<Type, error?> strm, table<map<Type>> tbl, error? err) returns table<map<Type>>|error {
     record {| Type value; |}|error? v = strm.next();
     while (v is record {| Type value; |}) {
         error? e = trap tbl.add(<map<Type>> v.value);
@@ -131,7 +177,7 @@ public function addToTable(stream<Type, error?> strm, table<map<Type>> tbl, erro
     return tbl;
 }
 
-public function consumeStream(stream<Type, error?> strm) returns error? {
+function consumeStream(stream<Type, error?> strm) returns error? {
     any|error? v = strm.next();
     while (!(v is () || v is error)) {
         v = strm.next();
@@ -141,6 +187,37 @@ public function consumeStream(stream<Type, error?> strm) returns error? {
     }
 }
 
-// TODO: This for debugging purposes, remove once completed.
-public function print(any|error? data) = external;
+// Check whether a float is NaN
+function checkNaN(float x) returns boolean = external;
 
+// TODO: This for debugging purposes, remove once completed.
+function print(any|error? data) = external;
+
+class IterHelper {
+    public _StreamPipeline pipeline;
+    public typedesc<Type> outputType;
+
+    function init(_StreamPipeline pipeline, typedesc<Type> outputType) {
+      self.pipeline = pipeline;
+      self.outputType = outputType;
+    }
+
+    public function next() returns record {|Type value;|}|error? {
+        _StreamPipeline p = self.pipeline;
+        _Frame|error? f = p.next();
+        if (f is _Frame) {
+            Type v = <Type>f["$value$"];
+            // Add orderKey and orderDirection values to respective arrays.
+            if ((!(f["$orderKey$"] is ())) && (!(f["$orderDirection$"] is ()))) {
+                anydata[] orKey = <anydata[]>f["$orderKey$"];
+                // Need to keep the stream value to sort the stream.
+                orKey.push(<anydata>v);
+                orderFieldValsArr.push(orKey);
+                orderDirectionsArr = <boolean[]>f["$orderDirection$"];
+            }
+            return internal:setNarrowType(self.outputType, {value: v});
+        } else {
+            return f;
+        }
+    }
+}

@@ -18,7 +18,6 @@ package org.ballerinalang.langserver.common.utils;
 import org.ballerinalang.langserver.command.testgen.TestGenerator;
 import org.ballerinalang.langserver.common.ImportsAcceptor;
 import org.ballerinalang.langserver.commons.LSContext;
-import org.ballerinalang.langserver.commons.completion.CompletionKeys;
 import org.ballerinalang.langserver.compiler.DocumentServiceKeys;
 import org.ballerinalang.model.elements.PackageID;
 import org.ballerinalang.model.symbols.SymbolKind;
@@ -167,9 +166,7 @@ public class FunctionGenerator {
      */
     public static List<String> getFuncArguments(BInvokableSymbol symbol, LSContext ctx) {
         List<String> list = new ArrayList<>();
-        int invocationType = (ctx == null || ctx.get(CompletionKeys.INVOCATION_TOKEN_TYPE_KEY) == null) ? -1
-                : ctx.get(CompletionKeys.INVOCATION_TOKEN_TYPE_KEY);
-        boolean skipFirstParam = CommonUtil.skipFirstParam(symbol, invocationType);
+        boolean skipFirstParam = CommonUtil.skipFirstParam(ctx, symbol);
         BVarSymbol restParam = symbol.restParam;
         if (symbol.kind == null && SymbolKind.RECORD == symbol.owner.kind || SymbolKind.FUNCTION == symbol.owner.kind) {
             if (symbol.type instanceof BInvokableType) {
@@ -413,10 +410,6 @@ public class FunctionGenerator {
                 // Anon Object
                 StringBuilder builder = new StringBuilder();
                 BObjectTypeSymbol objectTypeSymbol = (BObjectTypeSymbol) tSymbol;
-                boolean isAbstract = (objectTypeSymbol.flags & Flags.ABSTRACT) == Flags.ABSTRACT;
-                if (isAbstract) {
-                    builder.append("abstract ");
-                }
                 builder.append("object {");
                 if (objectTypeSymbol.attachedFuncs != null && !objectTypeSymbol.attachedFuncs.isEmpty()) {
                     builder.append(CommonUtil.LINE_SEPARATOR);
@@ -493,9 +486,6 @@ public class FunctionGenerator {
         }
         if ((flagValue & Flags.PRIVATE) == Flags.PRIVATE) {
             joiner.add("private");
-        }
-        if ((flagValue & Flags.ABSTRACT) == Flags.ABSTRACT) {
-            joiner.add("abstract");
         }
         if ((flagValue & Flags.REMOTE) == Flags.REMOTE) {
             joiner.add("remote");
@@ -580,6 +570,15 @@ public class FunctionGenerator {
             String paramsStr = String.join(", ", list);
             String newObjStr = "new " + pkgPrefix + bStruct.name.getValue() + "(" + paramsStr + ")";
             return template.replace("{%1}", newObjStr);
+        } else if (bType instanceof BRecordType) {
+            BRecordType recordType = (BRecordType) bType;
+            StringJoiner sb = new StringJoiner(", ");
+            if (CommonUtil.isInvalidSymbol(recordType.tsymbol)) {
+                for (BField field : recordType.fields.values()) {
+                    sb.add(field.name.value + ": " + generateReturnValue(field.type.tsymbol, "{%1}"));
+                }
+            }
+            return template.replace("{%1}", "{" + sb.toString() + "}");
         }
         return (bType.tsymbol != null) ? generateReturnValue(bType.tsymbol, template) :
                 template.replace("{%1}", "()");

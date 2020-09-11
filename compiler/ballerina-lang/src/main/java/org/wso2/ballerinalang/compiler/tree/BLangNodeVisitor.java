@@ -26,6 +26,8 @@ import org.wso2.ballerinalang.compiler.tree.clauses.BLangLetClause;
 import org.wso2.ballerinalang.compiler.tree.clauses.BLangLimitClause;
 import org.wso2.ballerinalang.compiler.tree.clauses.BLangOnClause;
 import org.wso2.ballerinalang.compiler.tree.clauses.BLangOnConflictClause;
+import org.wso2.ballerinalang.compiler.tree.clauses.BLangOrderByClause;
+import org.wso2.ballerinalang.compiler.tree.clauses.BLangOrderKey;
 import org.wso2.ballerinalang.compiler.tree.clauses.BLangSelectClause;
 import org.wso2.ballerinalang.compiler.tree.clauses.BLangWhereClause;
 import org.wso2.ballerinalang.compiler.tree.expressions.BLangAnnotAccessExpr;
@@ -73,6 +75,7 @@ import org.wso2.ballerinalang.compiler.tree.expressions.BLangMatchExpression;
 import org.wso2.ballerinalang.compiler.tree.expressions.BLangMatchExpression.BLangMatchExprPatternClause;
 import org.wso2.ballerinalang.compiler.tree.expressions.BLangNamedArgsExpression;
 import org.wso2.ballerinalang.compiler.tree.expressions.BLangNumericLiteral;
+import org.wso2.ballerinalang.compiler.tree.expressions.BLangObjectConstructorExpression;
 import org.wso2.ballerinalang.compiler.tree.expressions.BLangQueryAction;
 import org.wso2.ballerinalang.compiler.tree.expressions.BLangQueryExpr;
 import org.wso2.ballerinalang.compiler.tree.expressions.BLangRawTemplateLiteral;
@@ -235,10 +238,6 @@ public abstract class BLangNodeVisitor {
         throw new AssertionError();
     }
 
-    public void visit(BLangEndpoint endpointNode) {
-        throw new AssertionError();
-    }
-
     public void visit(BLangIdentifier identifierNode) {
         throw new AssertionError();
     }
@@ -357,6 +356,14 @@ public abstract class BLangNodeVisitor {
     }
 
     public void visit(BLangOnClause onClause) {
+        throw new AssertionError();
+    }
+
+    public void visit(BLangOrderKey orderKeyClause) {
+        throw new AssertionError();
+    }
+
+    public void visit(BLangOrderByClause orderByClause) {
         throw new AssertionError();
     }
 
@@ -662,6 +669,10 @@ public abstract class BLangNodeVisitor {
         throw new AssertionError();
     }
 
+    public void visit(BLangObjectConstructorExpression bLangObjectConstructorExpression) {
+        throw new AssertionError();
+    }
+
     // Type nodes
 
     public void visit(BLangValueType valueType) {
@@ -920,5 +931,9 @@ public abstract class BLangNodeVisitor {
 
     public void visit(BLangXMLNavigationAccess xmlNavigation) {
         throw new AssertionError();
+    }
+
+    public void visit(BLangClassDefinition classDefinition) {
+        throw  new AssertionError();
     }
 }

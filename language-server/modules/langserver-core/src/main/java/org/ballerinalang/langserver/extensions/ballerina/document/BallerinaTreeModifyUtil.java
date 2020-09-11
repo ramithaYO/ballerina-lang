@@ -18,12 +18,12 @@ package org.ballerinalang.langserver.extensions.ballerina.document;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import io.ballerinalang.compiler.text.LinePosition;
-import io.ballerinalang.compiler.text.TextDocument;
-import io.ballerinalang.compiler.text.TextDocumentChange;
-import io.ballerinalang.compiler.text.TextDocuments;
-import io.ballerinalang.compiler.text.TextEdit;
-import io.ballerinalang.compiler.text.TextRange;
+import io.ballerina.tools.text.LinePosition;
+import io.ballerina.tools.text.TextDocument;
+import io.ballerina.tools.text.TextDocumentChange;
+import io.ballerina.tools.text.TextDocuments;
+import io.ballerina.tools.text.TextEdit;
+import io.ballerina.tools.text.TextRange;
 import org.ballerinalang.langserver.LSContextOperation;
 import org.ballerinalang.langserver.commons.LSContext;
 import org.ballerinalang.langserver.commons.workspace.WorkspaceDocumentException;
@@ -39,17 +39,21 @@ import org.ballerinalang.langserver.compiler.sourcegen.FormattingSourceGen;
 import org.ballerinalang.langserver.extensions.ballerina.document.visitor.DeleteRange;
 import org.ballerinalang.langserver.extensions.ballerina.document.visitor.UnusedNodeVisitor;
 import org.ballerinalang.util.diagnostic.Diagnostic;
+import org.eclipse.lsp4j.TextDocumentContentChangeEvent;
 import org.wso2.ballerinalang.compiler.tree.BLangImportPackage;
 import org.wso2.ballerinalang.compiler.tree.BLangPackage;
 
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * Represents a request for a Ballerina AST Modify.
@@ -68,26 +72,42 @@ public class BallerinaTreeModifyUtil {
         put("DELETE", "");
         put("IMPORT", "import $TYPE;\n");
         put("DECLARATION", "$TYPE $VARIABLE = new ($PARAMS);\n");
-        put("REMOTE_SERVICE_CALL_CHECK", "$TYPE $VARIABLE = check $CALLER->$FUNCTION($PARAMS);\n");
+        put("REMOTE_SERVICE_CALL_CHECK", "$TYPE $VARIABLE = checkpanic $CALLER->$FUNCTION($PARAMS);\n");
         put("REMOTE_SERVICE_CALL", "$TYPE $VARIABLE = $CALLER->$FUNCTION($PARAMS);\n");
-        put("SERVICE_CALL_CHECK", "$TYPE $VARIABLE = check $CALLER.$FUNCTION($PARAMS);\n");
+        put("SERVICE_CALL_CHECK", "$TYPE $VARIABLE = checkpanic $CALLER.$FUNCTION($PARAMS);\n");
         put("SERVICE_CALL", "$TYPE $VARIABLE = $CALLER.$FUNCTION($PARAMS);\n");
         put("MAIN_START", "$COMMENTpublic function main() {\n");
-        put("MAIN_END", "}\n");
+        put("MAIN_START_MODIFY", "$COMMENTpublic function main() {");
+        put("MAIN_END", "\n}\n");
         put("SERVICE_START", "@http:ServiceConfig {\n\tbasePath: \"/\"\n}\n" +
                 "service $SERVICE on new http:Listener($PORT) {\n" +
                 "@http:ResourceConfig {\n\tmethods: [$METHODS],\npath: \"/$RES_PATH\"\n}\n" +
                 "    resource function $RESOURCE(http:Caller caller, http:Request req) {\n\n");
+        put("SERVICE_START_MODIFY", "@http:ServiceConfig {\n\tbasePath: \"/\"\n}\n" +
+                "service $SERVICE on new http:Listener($PORT) {\n" +
+                "@http:ResourceConfig {\n\tmethods: [$METHODS],\npath: \"/$RES_PATH\"\n}\n" +
+                "    resource function $RESOURCE(http:Caller caller, http:Request req) {");
         put("SERVICE_END",
                 "    }\n" +
                         "}\n");
         put("IF_STATEMENT", "if ($CONDITION) {\n" +
                 "\n} else {\n\n}\n");
         put("FOREACH_STATEMENT", "foreach $TYPE $VARIABLE in $COLLECTION {\n" +
-                "\n}");
-        put("LOG_STATEMENT", "log:print$TYPE(\"$LOG_EXPR\");");
-        put("PROPERTY_STATEMENT", "$PROPERTY");
-        put("RETURN_STATEMENT", "return $RETURN_EXPR;");
+                "\n}\n");
+        put("LOG_STATEMENT", "log:print$TYPE($LOG_EXPR);\n");
+        put("PROPERTY_STATEMENT", "$PROPERTY\n");
+        put("RESPOND", "$TYPE $VARIABLE = $CALLER->respond($EXPRESSION);\n");
+        put("TYPE_GUARD_IF", "if($VARIABLE is $TYPE) {\n" +
+                "$STATEMENT" +
+                "\n}\n");
+        put("TYPE_GUARD_ELSE_IF", "else if($VARIABLE is $TYPE) {\n" +
+                "\n}\n");
+        put("TYPE_GUARD_ELSE", " else {\n" +
+                "\n}\n");
+        put("RESPOND_WITH_CHECK", "checkpanic $CALLER->respond(<@untainted>$EXPRESSION);\n");
+        put("PROPERTY_STATEMENT", "$PROPERTY\n");
+        put("RETURN_STATEMENT", "return $RETURN_EXPR;\n");
+        put("CHECKED_PAYLOAD_FUNCTION_INVOCATION", "$TYPE $VARIABLE = checkpanic $RESPONSE.$PAYLOAD();\n");
     }};
 
     public static String resolveMapping(String type, JsonObject config) {
@@ -138,7 +158,7 @@ public class BallerinaTreeModifyUtil {
             int startOffset = textDocument.textPositionFrom(startLinePos);
             int endOffset = textDocument.textPositionFrom(endLinePos) + 1;
             edits.add(TextEdit.from(
-                    io.ballerinalang.compiler.text.TextRange.from(startOffset,
+                    TextRange.from(startOffset,
                             endOffset - startOffset), ""));
         }
         return edits;
@@ -158,7 +178,7 @@ public class BallerinaTreeModifyUtil {
         int theEndOffset = oldTextDocument.textPositionFrom(LinePosition.from(
                 endLine - 1, endColumn - 1));
         return TextEdit.from(
-                io.ballerinalang.compiler.text.TextRange.from(theStartOffset,
+                TextRange.from(theStartOffset,
                         theEndOffset - theStartOffset), mainStartMapping);
     }
 
@@ -190,25 +210,36 @@ public class BallerinaTreeModifyUtil {
 
         String fileContent = documentManager.getFileContent(compilationPath);
         TextDocument oldTextDocument = TextDocuments.from(fileContent);
-        List<TextEdit> edits =
-                BallerinaTreeModifyUtil.getUnusedImportRanges(unusedNodeVisitor.unusedImports(),
-                        oldTextDocument);
-        for (ASTModification astModification : astModifications) {
-            if (IMPORT.equalsIgnoreCase(astModification.getType())) {
-                if (importExist(unusedNodeVisitor, astModification)) {
-                    continue;
-                }
+
+        List<TextEdit> edits = new ArrayList<>();
+        List<ASTModification> importModifications = Arrays.stream(astModifications)
+                .filter(astModification -> IMPORT.equalsIgnoreCase(astModification.getType()))
+                .collect(Collectors.toList());
+        for (ASTModification importModification : importModifications) {
+            if (importExist(unusedNodeVisitor, importModification)) {
+                continue;
             }
-            TextEdit edit = constructEdit(unusedNodeVisitor, oldTextDocument, astModification);
+            TextEdit edit = constructEdit(unusedNodeVisitor, oldTextDocument, importModification);
             if (edit != null) {
                 edits.add(edit);
+            }
+        }
+        edits.addAll(BallerinaTreeModifyUtil.getUnusedImportRanges(unusedNodeVisitor.unusedImports(),
+                        oldTextDocument));
+        for (ASTModification astModification : astModifications) {
+            if (!IMPORT.equalsIgnoreCase(astModification.getType())) {
+                TextEdit edit = constructEdit(unusedNodeVisitor, oldTextDocument, astModification);
+                if (edit != null) {
+                    edits.add(edit);
+                }
             }
         }
 
         TextDocumentChange textDocumentChange = TextDocumentChange.from(edits.toArray(
                 new TextEdit[0]));
         TextDocument newTextDocument = oldTextDocument.apply(textDocumentChange);
-        documentManager.updateFile(compilationPath, newTextDocument.toString());
+        documentManager.updateFile(compilationPath, Collections
+                .singletonList(new TextDocumentContentChangeEvent(newTextDocument.toString())));
 
         //Format bal file code
         JsonObject jsonAST = TextDocumentFormatUtil.getAST(compilationPath, documentManager, astContext);
@@ -218,7 +249,8 @@ public class BallerinaTreeModifyUtil {
         formattingUtil.accept(model);
 
         String formattedSource = FormattingSourceGen.getSourceOf(model);
-        documentManager.updateFile(compilationPath, formattedSource);
+        TextDocumentContentChangeEvent changeEvent = new TextDocumentContentChangeEvent(formattedSource);
+        documentManager.updateFile(compilationPath, Collections.singletonList(changeEvent));
         astContext.put(BallerinaDocumentServiceImpl.UPDATED_SOURCE, formattedSource);
         return astContext;
     }

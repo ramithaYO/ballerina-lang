@@ -27,8 +27,8 @@ import org.ballerinalang.model.tree.statements.VariableDefinitionNode;
 import org.wso2.ballerinalang.compiler.tree.BLangAnnotation;
 import org.wso2.ballerinalang.compiler.tree.BLangAnnotationAttachment;
 import org.wso2.ballerinalang.compiler.tree.BLangBlockFunctionBody;
+import org.wso2.ballerinalang.compiler.tree.BLangClassDefinition;
 import org.wso2.ballerinalang.compiler.tree.BLangCompilationUnit;
-import org.wso2.ballerinalang.compiler.tree.BLangEndpoint;
 import org.wso2.ballerinalang.compiler.tree.BLangErrorVariable;
 import org.wso2.ballerinalang.compiler.tree.BLangErrorVariable.BLangErrorDetailEntry;
 import org.wso2.ballerinalang.compiler.tree.BLangExprFunctionBody;
@@ -63,6 +63,8 @@ import org.wso2.ballerinalang.compiler.tree.clauses.BLangLetClause;
 import org.wso2.ballerinalang.compiler.tree.clauses.BLangLimitClause;
 import org.wso2.ballerinalang.compiler.tree.clauses.BLangOnClause;
 import org.wso2.ballerinalang.compiler.tree.clauses.BLangOnConflictClause;
+import org.wso2.ballerinalang.compiler.tree.clauses.BLangOrderByClause;
+import org.wso2.ballerinalang.compiler.tree.clauses.BLangOrderKey;
 import org.wso2.ballerinalang.compiler.tree.clauses.BLangSelectClause;
 import org.wso2.ballerinalang.compiler.tree.clauses.BLangWhereClause;
 import org.wso2.ballerinalang.compiler.tree.expressions.BLangAccessExpression;
@@ -97,6 +99,7 @@ import org.wso2.ballerinalang.compiler.tree.expressions.BLangMarkdownReturnParam
 import org.wso2.ballerinalang.compiler.tree.expressions.BLangMatchExpression;
 import org.wso2.ballerinalang.compiler.tree.expressions.BLangNamedArgsExpression;
 import org.wso2.ballerinalang.compiler.tree.expressions.BLangNumericLiteral;
+import org.wso2.ballerinalang.compiler.tree.expressions.BLangObjectConstructorExpression;
 import org.wso2.ballerinalang.compiler.tree.expressions.BLangQueryAction;
 import org.wso2.ballerinalang.compiler.tree.expressions.BLangQueryExpr;
 import org.wso2.ballerinalang.compiler.tree.expressions.BLangRawTemplateLiteral;
@@ -264,6 +267,7 @@ public class NodeCloner extends BLangNodeVisitor {
             sourceNode.accept(this);
             result = sourceNode.cloneRef;
             result.pos = sourceNode.pos;
+            result.internal = sourceNode.internal;
             result.addWS(source.getWS());
             result.type = sourceNode.type;
         }
@@ -448,7 +452,7 @@ public class NodeCloner extends BLangNodeVisitor {
         clone.markdownDocumentationAttachment = clone(source.markdownDocumentationAttachment);
 
         clone.name = source.name;
-        clone.serviceTypeDefinition = clone(source.serviceTypeDefinition);
+        clone.serviceClass = clone(source.serviceClass);
         clone.attachedExprs = cloneList(source.attachedExprs);
 
         clone.variableNode = clone(source.variableNode);
@@ -496,11 +500,6 @@ public class NodeCloner extends BLangNodeVisitor {
 
     @Override
     public void visit(BLangWorker workerNode) {
-        // Ignore.
-    }
-
-    @Override
-    public void visit(BLangEndpoint endpointNode) {
         // Ignore.
     }
 
@@ -1392,7 +1391,25 @@ public class NodeCloner extends BLangNodeVisitor {
 
         BLangOnClause clone = new BLangOnClause();
         source.cloneRef = clone;
+        clone.lhsExpr = clone(source.lhsExpr);
+        clone.rhsExpr = clone(source.rhsExpr);
+    }
+
+    @Override
+    public void visit(BLangOrderKey source) {
+
+        BLangOrderKey clone = new BLangOrderKey();
+        source.cloneRef = clone;
         clone.expression = clone(source.expression);
+        clone.isAscending = source.isAscending;
+    }
+
+    @Override
+    public void visit(BLangOrderByClause source) {
+
+        BLangOrderByClause clone = new BLangOrderByClause();
+        source.cloneRef = clone;
+        clone.orderByKeyList = cloneList(source.orderByKeyList);
     }
 
     @Override
@@ -1534,7 +1551,6 @@ public class NodeCloner extends BLangNodeVisitor {
         source.cloneRef = clone;
         clone.functions = cloneList(source.functions);
         clone.initFunction = clone(source.initFunction);
-        clone.receiver = clone(source.receiver);
         clone.flagSet = cloneSet(source.flagSet, Flag.class);
         cloneBLangStructureTypeNode(source, clone);
         cloneBLangType(source, clone);
@@ -1916,6 +1932,7 @@ public class NodeCloner extends BLangNodeVisitor {
         clone.referenceName = source.referenceName;
         clone.kind = source.kind;
         clone.type = source.type;
+        clone.hasParserWarnings = source.hasParserWarnings;
     }
 
     @Override
@@ -1993,6 +2010,36 @@ public class NodeCloner extends BLangNodeVisitor {
                 cloneList(source.filters),
                 source.navAccessType,
                 clone(source.childIndex));
+        source.cloneRef = clone;
+    }
+
+    @Override
+    public void visit(BLangClassDefinition source) {
+        BLangClassDefinition clone = new BLangClassDefinition();
+        source.cloneRef = clone;
+        clone.pos = source.pos;
+        clone.addWS(source.getWS());
+        clone.annAttachments = cloneList(source.annAttachments);
+        clone.markdownDocumentationAttachment = clone(source.markdownDocumentationAttachment);
+        clone.flagSet = cloneSet(source.flagSet, Flag.class);
+        clone.name = clone(source.name);
+        clone.functions = cloneList(source.functions);
+        clone.fields = cloneList(source.fields);
+        clone.typeRefs = cloneList(source.typeRefs);
+        clone.initFunction = clone(source.initFunction);
+        clone.generatedInitFunction = clone(source.generatedInitFunction);
+        clone.receiver = clone(source.receiver);
+    }
+
+    @Override
+    public void visit(BLangObjectConstructorExpression source) {
+        BLangObjectConstructorExpression clone = new BLangObjectConstructorExpression();
+
+        clone.classNode = clone(source.classNode);
+        clone.pos = source.pos;
+        clone.referenceType = clone(source.referenceType);
+        clone.typeInit = clone(source.typeInit);
+
         source.cloneRef = clone;
     }
 }

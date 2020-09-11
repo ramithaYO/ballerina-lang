@@ -32,11 +32,11 @@ public type RetriableError error;
 //todo use distinct when grammer allowes
 //public type RetriableError distinct error;
 
-public type RetryManager abstract object {
+public type RetryManager object {
  public function shouldRetry(error? e) returns boolean;
 };
 
-public type DefaultRetryManager object {
+public class DefaultRetryManager {
     private int count;
     public function init(int count = 3) {
         self.count = count;
@@ -49,7 +49,7 @@ public type DefaultRetryManager object {
            return false;
         }
     }
-};
+}
 
 public type CommitHandler function(Info info);
 public type RollbackHandler function(Info info, error? cause, boolean willRetry);
@@ -61,7 +61,14 @@ public transactional function onRollback(RollbackHandler handler) = external;
 
 public transactional function info() returns Info = external;
 
-public transactional function setRollbackOnly(error? e) = external;
+public transactional function setRollbackOnly(error? e) {
+    if(e is error) {
+      TransactionError trxError = prepareError(e.message(), e);
+      wrapRollbackError(trxError);
+    }
+}
+
+function wrapRollbackError(Error? e) = external;
 
 public transactional function getRollbackOnly() returns boolean = external;
 

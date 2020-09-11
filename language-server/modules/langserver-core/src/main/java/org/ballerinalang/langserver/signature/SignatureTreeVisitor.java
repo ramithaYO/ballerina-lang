@@ -78,10 +78,10 @@ public class SignatureTreeVisitor extends LSNodeVisitor {
      * Public constructor.
      * @param context    Document service context for the signature operation
      */
-    public SignatureTreeVisitor(LSContext context) {
+    public SignatureTreeVisitor(LSContext context, Position position) {
         blockPositionStack = new ArrayDeque<>();
         lsContext = context;
-        cursorPosition = context.get(DocumentServiceKeys.POSITION_KEY).getPosition();
+        cursorPosition = position;
 
         CompilerContext compilerContext = context.get(DocumentServiceKeys.COMPILER_CONTEXT_KEY);
         symTable = SymbolTable.getInstance(compilerContext);
@@ -127,6 +127,9 @@ public class SignatureTreeVisitor extends LSNodeVisitor {
         BSymbol funcSymbol = funcNode.symbol;
         SymbolEnv funcEnv = SymbolEnv.createFunctionEnv(funcNode, funcSymbol.scope, symbolEnv);
         blockPositionStack.push(funcNode.pos);
+        for (BLangAnnotationAttachment annAttachments : funcNode.annAttachments) {
+            this.acceptNode(annAttachments, funcEnv);
+        }
         this.acceptNode(funcNode.body, funcEnv);
         blockPositionStack.pop();
         // Process workers
@@ -138,12 +141,11 @@ public class SignatureTreeVisitor extends LSNodeVisitor {
 
     @Override
     public void visit(BLangService serviceNode) {
-        BLangObjectTypeNode serviceType = (BLangObjectTypeNode) serviceNode.serviceTypeDefinition.typeNode;
         List<BLangNode> serviceContent = new ArrayList<>();
-        SymbolEnv serviceEnv = SymbolEnv.createPkgLevelSymbolEnv(serviceNode, serviceType.symbol.scope, symbolEnv);
-        List<BLangFunction> serviceFunctions = ((BLangObjectTypeNode) serviceNode.serviceTypeDefinition.typeNode)
-                .getFunctions();
-        List<BLangSimpleVariable> serviceFields = serviceType.getFields().stream()
+        SymbolEnv serviceEnv = SymbolEnv.createPkgLevelSymbolEnv(serviceNode,
+                serviceNode.serviceClass.symbol.scope, symbolEnv);
+        List<BLangFunction> serviceFunctions = serviceNode.serviceClass.functions;
+        List<BLangSimpleVariable> serviceFields = serviceNode.serviceClass.fields.stream()
                 .map(simpleVar -> (BLangSimpleVariable) simpleVar)
                 .collect(Collectors.toList());
         List<BLangAnnotationAttachment> annAttachments = serviceNode.annAttachments;

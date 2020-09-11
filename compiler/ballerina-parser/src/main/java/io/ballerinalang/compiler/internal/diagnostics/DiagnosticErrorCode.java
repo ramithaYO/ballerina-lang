@@ -17,7 +17,7 @@
  */
 package io.ballerinalang.compiler.internal.diagnostics;
 
-import io.ballerinalang.compiler.diagnostics.DiagnosticSeverity;
+import io.ballerina.tools.diagnostics.DiagnosticSeverity;
 
 /**
  * Represents a diagnostic error code.
@@ -129,6 +129,17 @@ public enum DiagnosticErrorCode implements DiagnosticCode {
     ERROR_MISSING_IMPORT_KEYWORD("BCE02064", "error.missing.import.keyword"),
     ERROR_MISSING_CONST_KEYWORD("BCE02065", "error.missing.const.keyword"),
     ERROR_MISSING_EXTERNAL_KEYWORD("BCE02066", "error.missing.external.keyword"),
+    ERROR_MISSING_ORDER_KEYWORD("BCE02067", "error.missing.order.keyword"),
+    ERROR_MISSING_BY_KEYWORD("BCE02068", "error.missing.by.keyword"),
+    ERROR_MISSING_CONFLICT_KEYWORD("BCE02069", "error.missing.conflict.keyword"),
+    ERROR_MISSING_LIMIT_KEYWORD("BCE02070", "error.missing.limit.keyword"),
+    ERROR_MISSING_ASCENDING_KEYWORD("BCE02071", "error.missing.ascending.keyword"),
+    ERROR_MISSING_DESCENDING_KEYWORD("BCE02072", "error.missing.descending.keyword"),
+    ERROR_MISSING_JOIN_KEYWORD("BCE02073", "error.missing.join.keyword"),
+    ERROR_MISSING_OUTER_KEYWORD("BCE02074", "error.missing.outer.keyword"),
+    ERROR_MISSING_CLASS_KEYWORD("BCE02075", "error.missing.class.keyword"),
+    ERROR_MISSING_FAIL_KEYWORD("BCE02075", "error.missing.fail.keyword"),
+    ERROR_MISSING_EQUALS_KEYWORD("BCE02076", "error.missing.equals.keyword"),
 
     // Type keywords
     ERROR_MISSING_INT_KEYWORD("BCE02101", "error.missing.int.keyword"),
@@ -198,6 +209,7 @@ public enum DiagnosticErrorCode implements DiagnosticCode {
     ERROR_MISSING_HEX_FLOATING_POINT_LITERAL("BCE02505", "error.missing.hex.floating.point.literal"),
     ERROR_MISSING_XML_TEXT_CONTENT("BCE02506", "error.missing.xml.text.content"),
     ERROR_MISSING_TEMPLATE_STRING("BCE02507", "error.missing.template.string"),
+    ERROR_MISSING_BYTE_ARRAY_CONTENT("BCE02508", "error.missing.byte.array.content"),
 
     //miscellaneous
     ERROR_MISSING_FUNCTION_NAME("BCE0060", "error.missing.function.name"),
@@ -213,6 +225,9 @@ public enum DiagnosticErrorCode implements DiagnosticCode {
     ERROR_MISSING_TUPLE_MEMBER("BCE108", "error.missing.tuple.member"),
     ERROR_EXPRESSION_EXPECTED_ACTION_FOUND("BCE109", "error.expression.expected.action.found"),
     ERROR_MISSING_KEY_EXPR_IN_MEMBER_ACCESS_EXPR("BCE109", "error.missing.key.expr.in.member.access.expr"),
+    ONLY_TYPE_REFERENCE_ALLOWED_HERE_AS_TYPE_INCLUSIONS("BCE110",
+            "error.only.type.reference.allowed.here.as.type.inclusions"),
+    ERROR_MISSING_ORDER_KEY("BCE110", "error.missing.order.key"),
 
     ERROR_MISSING_ANNOTATION_ATTACH_POINT("BCE200", "error.missing.annotation.attach.point"),
     ERROR_MISSING_LET_VARIABLE_DECLARATION("BCE201", "error.missing.let.variable.declaration"),
@@ -227,39 +242,51 @@ public enum DiagnosticErrorCode implements DiagnosticCode {
     // Expression followed by the start keyword must be a func-call, a method-call or a remote-method-call
     ERROR_INVALID_EXPRESSION_IN_START_ACTION("BCE207", "error.invalid.expression.in.start.action"),
     // Cannot have the  same qualifier twice
-    ERROR_SAME_OBJECT_TYPE_QUALIFIER("BCE208", "error.same.object.type.qualifier"),
+    ERROR_DUPLICATE_OBJECT_TYPE_QUALIFIER("BCE208", "error.duplicate.object.type.qualifier"),
+    ERROR_DUPLICATE_CLASS_TYPE_QUALIFIER("BCE209", "error.duplicate.class.type.qualifier"),
+    ERROR_DUPLICATE_OBJECT_METHOD_QUALIFIER("BCE210", "error.duplicate.object.method.qualifier"),
+    ERROR_QUALIFIER_NOT_ALLOWED("BCE211", "error.qualifier.not.allowed"),
+    ERROR_ABSTRACT_QUALIFIER_NOT_ALLOWED_IN_OBJECT("BCE212", "error.abstract.qualifier.not.allowed.in.object"),
+    ERROR_READONLY_QUALIFIER_NOT_ALLOWED_IN_OBJECT("BCE213", "error.readonly.qualifier.not.allowed.in.object"),
+    // Cannot have type inclusions in object constructor
+    ERROR_TYPE_INCLUSION_IN_OBJECT_CONSTRUCTOR("BCE214", "error.type.inclusion.in.object.constructor"),
+    ERROR_SAME_OBJECT_TYPE_QUALIFIER("BCE215", "error.same.object.type.qualifier"),
+    ERROR_DUPLICATE_QUALIFIER("BCE216", "error.duplicate.qualifier"),
     // Mapping constructor expression cannot be used as a wait expression
-    ERROR_MAPPING_CONSTRUCTOR_EXPR_AS_A_WAIT_EXPR("BCE209",
-            "error.mapping.constructor.expr.as.a.wait.expr"),
+    ERROR_MAPPING_CONSTRUCTOR_EXPR_AS_A_WAIT_EXPR("BCE217", "error.mapping.constructor.expr.as.a.wait.expr"),
     // lhs must be an identifier or a param list
-    ERROR_INVALID_PARAM_LIST_IN_INFER_ANONYMOUS_FUNCTION_EXPR("BCE210",
+    ERROR_INVALID_PARAM_LIST_IN_INFER_ANONYMOUS_FUNCTION_EXPR("BCE218",
             "error.invalid.param.list.in.infer.anonymous.function.expr"),
     // Cannot have more fields after the rest type descriptor
-    ERROR_MORE_RECORD_FIELDS_AFTER_REST_FIELD("BCE211", "error.more.record.fields.after.rest.field"),
-    ERROR_INVALID_XML_NAMESPACE_URI("BCE212", "error.invalid.xml.namespace.uri"),
-    ERROR_INTERPOLATION_IS_NOT_ALLOWED_FOR_XML_TAG_NAMES("BCE213",
+    ERROR_MORE_RECORD_FIELDS_AFTER_REST_FIELD("BCE219", "error.more.record.fields.after.rest.field"),
+    ERROR_INVALID_XML_NAMESPACE_URI("BCE220", "error.invalid.xml.namespace.uri"),
+    ERROR_INTERPOLATION_IS_NOT_ALLOWED_FOR_XML_TAG_NAMES("BCE221",
             "error.interpolation.is.not.allowed.for.xml.tag.names"),
-    ERROR_INTERPOLATION_IS_NOT_ALLOWED_WITHIN_ELEMENT_TAGS("BCE214",
+    ERROR_INTERPOLATION_IS_NOT_ALLOWED_WITHIN_ELEMENT_TAGS("BCE222",
             "error.interpolation.is.not.allowed.within.element.tags"),
-    ERROR_INTERPOLATION_IS_NOT_ALLOWED_WITHIN_XML_COMMENTS("BCE215",
+    ERROR_INTERPOLATION_IS_NOT_ALLOWED_WITHIN_XML_COMMENTS("BCE223",
             "error.interpolation.is.not.allowed.within.xml.comments"),
-    ERROR_INTERPOLATION_IS_NOT_ALLOWED_WITHIN_XML_PI("BCE216",
+    ERROR_INTERPOLATION_IS_NOT_ALLOWED_WITHIN_XML_PI("BCE224",
             "error.interpolation.is.not.allowed.within.xml.pi"),
-    ERROR_INVALID_EXPR_IN_ASSIGNMENT_LHS("BCE217", "error.invalid.expr.in.assignment.lhs"),
-    ERROR_INVALID_EXPR_IN_COMPOUND_ASSIGNMENT_LHS("BCE217",
+    ERROR_INVALID_EXPR_IN_ASSIGNMENT_LHS("BCE225", "error.invalid.expr.in.assignment.lhs"),
+    ERROR_INVALID_EXPR_IN_COMPOUND_ASSIGNMENT_LHS("BCE226",
             "error.invalid.expr.in.compound.assignment.lhs"),
-    ERROR_INVALID_METADATA("BCE218", "error.invalid.metadata"),
-    ERROR_INVALID_QUALIFIER("BCE219", "error.invalid.qualifier"),
-    ERROR_INVALID_ANNOTATIONS("BCE220", "error.invalid.annotations"),
-    ERROR_MORE_FIELD_MATCH_PATTERNS_AFTER_REST_FIELD("BCE221",
+    ERROR_INVALID_METADATA("BCE227", "error.invalid.metadata"),
+    ERROR_INVALID_QUALIFIER("BCE228", "error.invalid.qualifier"),
+    ERROR_INVALID_ANNOTATIONS("BCE229", "error.invalid.annotations"),
+    ERROR_MORE_FIELD_MATCH_PATTERNS_AFTER_REST_FIELD("BCE230",
             "error.more.field.match.patterns.after.rest.field"),
-    ERROR_ACTION_AS_A_WAIT_EXPR("BCE222", "error.action.as.a.wait.expr"),
+    ERROR_ACTION_AS_A_WAIT_EXPR("BCE231", "error.action.as.a.wait.expr"),
+    ERROR_INVALID_USAGE_OF_VAR("BCE232", "error.invalid.usage.of.var"),
+    ERROR_MORE_MATCH_PATTERNS_AFTER_REST_MATCH_PATTERN("BCE233",
+            "error.more.match.patterns.after.rest.match.pattern"),
 
     ERROR_PARAMETER_AFTER_THE_REST_PARAMETER("BCE300", "error.parameter.after.the.rest.parameter"),
     ERROR_REQUIRED_PARAMETER_AFTER_THE_DEFAULTABLE_PARAMETER("BCE301",
             "error.required.parameter.after.the.defaultable.parameter"),
     ERROR_NAMED_ARG_FOLLOWED_BY_POSITIONAL_ARG("BCE302", "error.named.arg.followed.by.positional.arg"),
     ERROR_ARG_FOLLOWED_BY_REST_ARG("BCE303", "error.arg.followed.by.rest.arg"),
+    ERROR_BINDING_PATTERN_NOT_ALLOWED("BCE304", "error.binding.pattern.not.allowed"),
 
     ERROR_INVALID_BASE16_CONTENT_IN_BYTE_ARRAY_LITERAL("BCE401",
             "error.invalid.base16.content.in.byte.array.literal"),
@@ -272,10 +299,12 @@ public enum DiagnosticErrorCode implements DiagnosticCode {
     ERROR_INVALID_ARRAY_LENGTH("BCE501", "error.invalid.array.length"),
     ERROR_SELECT_CLAUSE_IN_QUERY_ACTION("BCE502", "error.select.clause.in.query.action"),
     ERROR_MORE_CLAUSES_AFTER_SELECT_CLAUSE("BCE503", "error.more.clauses.after.select.clause"),
+    ERROR_QUERY_CONSTRUCT_TYPE_IN_QUERY_ACTION("BCE504", "error.query.construct.type.in.query.action"),
 
     ERROR_NO_WHITESPACES_ALLOWED_IN_RIGHT_SHIFT_OP("BCE601", "error.no.whitespaces.allowed.in.right.shift.op"),
     ERROR_NO_WHITESPACES_ALLOWED_IN_UNSIGNED_RIGHT_SHIFT_OP("BCE602",
             "error.no.whitespaces.allowed.in.unsigned.right.shift.op"),
+    ERROR_INVALID_WHITESPACE_IN_SLASH_LT_TOKEN("BCE603", "error.invalid.whitespace.in.slash.lt.token"),
 
     // Lexer errors
     ERROR_LEADING_ZEROS_IN_NUMERIC_LITERALS("BCE1000", "error.leading.zeros.in.numeric.literals"),

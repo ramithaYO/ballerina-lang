@@ -25,8 +25,8 @@ import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 import org.wso2.ballerinalang.compiler.tree.BLangAnnotation;
+import org.wso2.ballerinalang.compiler.tree.BLangClassDefinition;
 import org.wso2.ballerinalang.compiler.tree.BLangMarkdownDocumentation;
-import org.wso2.ballerinalang.compiler.tree.BLangTypeDefinition;
 
 /**
  * Test cases for user defined documentation attachment in ballerina.
@@ -40,12 +40,12 @@ public class ObjectDocumentationTest {
     public void setup() {
     }
 
-    @Test(description = "Test doc annotation.")
+    @Test(description = "Test doc annotation.", groups = { "disableOnOldParser" })
     public void testDocAnnotation() {
         CompileResult compileResult = BCompileUtil.compile("test-src/object/object_annotation.bal");
-        Assert.assertEquals(0, compileResult.getWarnCount());
+        Assert.assertEquals(compileResult.getWarnCount(), 3);
         PackageNode packageNode = compileResult.getAST();
-        BLangMarkdownDocumentation docNode = ((BLangTypeDefinition) packageNode.getTypeDefinitions()
+        BLangMarkdownDocumentation docNode = ((BLangClassDefinition) packageNode.getClassDefinitions()
                 .get(0)).markdownDocumentationAttachment;
         Assert.assertNotNull(docNode);
         Assert.assertEquals(docNode.getDocumentation().replaceAll(CARRIAGE_RETURN_CHAR, EMPTY_STRING),
@@ -66,13 +66,13 @@ public class ObjectDocumentationTest {
         Assert.assertNotNull(docNode);
     }
 
-    @Test(description = "Test doc struct.", groups = { "brokenOnNewParser" })
+    @Test(description = "Test doc struct.", groups = { "disableOnOldParser" })
     public void testDocStruct() {
         CompileResult compileResult = BCompileUtil.compile("test-src/object/object_doc_annotation.bal");
-        Assert.assertEquals(0, compileResult.getWarnCount());
+        Assert.assertEquals(compileResult.getWarnCount(), 0);
         PackageNode packageNode = compileResult.getAST();
         BLangMarkdownDocumentation dNode =
-                ((BLangTypeDefinition) packageNode.getTypeDefinitions().get(0)).markdownDocumentationAttachment;
+                ((BLangClassDefinition) packageNode.getClassDefinitions().get(0)).markdownDocumentationAttachment;
         Assert.assertNotNull(dNode);
         Assert.assertEquals(dNode.getDocumentation().replaceAll(CARRIAGE_RETURN_CHAR, EMPTY_STRING),
                 "Documentation for Test struct\n");
@@ -88,7 +88,7 @@ public class ObjectDocumentationTest {
                 EMPTY_STRING), "struct `field c` documentation");
     }
 
-    @Test(description = "Test doc negative cases.", groups = { "brokenOnNewParser" })
+    @Test(description = "Test doc negative cases.", groups = { "disableOnOldParser" })
     public void testDocumentationNegative() {
         CompileResult compileResult = BCompileUtil.compile("test-src/object/object_documentation_negative.bal");
         Assert.assertEquals(compileResult.getErrorCount(), 0, getErrorString(compileResult.getDiagnostics()));

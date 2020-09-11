@@ -72,17 +72,15 @@ public class LValueTest {
         validateError(negativeResult, 0, "uninitialized field 's'", 19, 5);
     }
 
-    @Test(groups = "brokenOnNewParser")
+    @Test(groups = "disableOnOldParser")
     public void testSemanticsNegativeCases() {
         Assert.assertEquals(semanticsNegativeResult.getErrorCount(), 9);
         int i = 0;
         validateError(semanticsNegativeResult, i++, "incompatible types: expected 'int', found 'string'", 18, 13);
         validateError(semanticsNegativeResult, i++, "undefined field 'y' in object 'A'", 27, 6);
         validateError(semanticsNegativeResult, i++, "invalid operation: type 'A' does not support indexing", 28, 5);
-        validateError(semanticsNegativeResult, i++, "optional field access cannot be used in the target expression " +
-                "of an assignment", 38, 5);
-        validateError(semanticsNegativeResult, i++, "optional field access cannot be used in the target expression " +
-                "of an assignment", 39, 5);
+        validateError(semanticsNegativeResult, i++, "invalid expr in compound assignment lhs", 38, 10);
+        validateError(semanticsNegativeResult, i++, "invalid expr in compound assignment lhs", 39, 10);
         validateError(semanticsNegativeResult, i++, "invalid operation: type 'map<int>?' does not support member " +
                 "access for assignment", 61, 5);
         validateError(semanticsNegativeResult, i++, "undefined field 'y' in record 'E'", 75, 5);
@@ -92,15 +90,14 @@ public class LValueTest {
                 79, 5);
     }
 
-    @Test(groups = "brokenOnNewParser")
+    @Test(groups = "disableOnOldParser")
     public void testNegativeLvexpr() {
         CompileResult negative = BCompileUtil.compile("test-src/statements/assign/lvexpr_negative.bal");
         int i = 0;
-        validateError(negative, i++, "invocations are not supported on the left hand side of an assignment", 26, 5);
-        validateError(negative, i++, "invocations are not supported on the left hand side of an assignment", 27, 5);
+        validateError(negative, i++, "invalid expr in assignment lhs", 26, 19);
+        validateError(negative, i++, "invalid expr in assignment lhs", 27, 19);
         Assert.assertEquals(i, negative.getErrorCount());
     }
-
 
     @Test(dataProvider = "valueStoreFunctions")
     public void testValueStore(String function) {
@@ -125,43 +122,45 @@ public class LValueTest {
     }
 
     @Test(expectedExceptions = BLangRuntimeException.class,
-            expectedExceptionsMessageRegExp = ".*\\{ballerina/lang.map\\}InherentTypeViolation message=invalid value " +
-                    "for record field 'i': expected value of type 'int', found 'string'.*")
+            expectedExceptionsMessageRegExp = ".*\\{ballerina/lang.map\\}InherentTypeViolation " +
+                    "\\{\"message\":\"invalid value for record field 'i': expected value of type 'int', found " +
+                    "'string'\"\\}.*")
     public void testInherentTypeViolatingUpdate1() {
         BRunUtil.invoke(result, "testInherentTypeViolatingUpdate1");
     }
 
     @Test(expectedExceptions = BLangRuntimeException.class,
-            expectedExceptionsMessageRegExp = ".*\\{ballerina/lang.object\\}InherentTypeViolation message=invalid " +
-                    "value for object field 'i': expected value of type 'boolean', found 'int'.*")
+            expectedExceptionsMessageRegExp = ".*\\{ballerina/lang.object\\}InherentTypeViolation " +
+                    "\\{\"message\":\"invalid value for object field 'i': expected value of type 'boolean', found " +
+                    "'int'\"\\}.*")
     public void testInherentTypeViolatingUpdate2() {
         BRunUtil.invoke(result, "testInherentTypeViolatingUpdate2");
     }
 
     @Test(expectedExceptions = BLangRuntimeException.class,
-            expectedExceptionsMessageRegExp = ".*\\{ballerina/lang.array\\}InherentTypeViolation message=incompatible" +
-                    " types: expected 'int', found 'string'.*")
+            expectedExceptionsMessageRegExp = ".*\\{ballerina/lang.array\\}InherentTypeViolation " +
+                    "\\{\"message\":\"incompatible types: expected 'int', found 'string'\"\\}.*")
     public void testInherentTypeViolatingUpdate3() {
         BRunUtil.invoke(result, "testInherentTypeViolatingUpdate3");
     }
 
     @Test(expectedExceptions = BLangRuntimeException.class,
-            expectedExceptionsMessageRegExp = ".*\\{ballerina/lang.map\\}KeyNotFound message=invalid field access: " +
-                    "field 'g' not found in record type 'DRec'.*")
+            expectedExceptionsMessageRegExp = ".*\\{ballerina/lang.map\\}KeyNotFound \\{\"message\":\"invalid field "
+                    + "access: field 'g' not found in record type 'DRec'\"\\}.*")
     public void testInvalidUpdateOnClosedRecord() {
         BRunUtil.invoke(result, "testInvalidUpdateOnClosedRecord");
     }
 
     @Test(expectedExceptions = BLangRuntimeException.class,
-            expectedExceptionsMessageRegExp = ".*\\{ballerina/lang.array\\}IndexOutOfRange message=array index out of" +
-                    " range: index: 2, size: 2.*")
+            expectedExceptionsMessageRegExp = ".*\\{ballerina/lang.array\\}IndexOutOfRange \\{\"message\":\"array " +
+                    "index out of range: index: 2, size: 2\"\\}.*")
     public void testInvalidUpdateOnClosedArray() {
         BRunUtil.invoke(result, "testInvalidUpdateOnClosedArray");
     }
 
     @Test(expectedExceptions = BLangRuntimeException.class,
-            expectedExceptionsMessageRegExp = ".*\\{ballerina/lang.map\\}InvalidUpdate message=Invalid update of " +
-                    "record field: modification not allowed on readonly value.*")
+            expectedExceptionsMessageRegExp = ".*\\{ballerina/lang.map\\}InvalidUpdate \\{\"message\":\"Invalid " +
+                    "update of record field: modification not allowed on readonly value\"\\}.*")
     public void testFrozenValueUpdate() {
         BRunUtil.invoke(result, "testFrozenValueUpdate");
     }
@@ -176,8 +175,9 @@ public class LValueTest {
     }
 
     @Test(expectedExceptions = BLangRuntimeException.class,
-            expectedExceptionsMessageRegExp = ".*\\{ballerina/lang.array\\}IllegalListInsertion message=array of " +
-                    "length 2 cannot be expanded into array of length 4 without filler values.*")
+            expectedExceptionsMessageRegExp = ".*\\{ballerina/lang.array\\}IllegalListInsertion " +
+                    "\\{\"message\":\"array of length 2 cannot be expanded into array of length 4 without filler " +
+                    "values\"\\}.*")
     public void testArrayFillFailure() {
         BRunUtil.invoke(result, "testArrayFillFailure");
     }
@@ -198,19 +198,22 @@ public class LValueTest {
     }
 
     @Test(expectedExceptions = BLangRuntimeException.class,
-            expectedExceptionsMessageRegExp = ".*\\{ballerina/lang.map\\}KeyNotFound message=cannot find key 'one'.*")
+            expectedExceptionsMessageRegExp = ".*\\{ballerina/lang.map\\}KeyNotFound \\{\"message\":\"cannot " +
+                    "find key 'one'\"\\}.*")
     public void testFillingReadOnMappingNegative() {
         BRunUtil.invoke(result, "testFillingReadOnMappingNegative");
     }
 
     @Test(expectedExceptions = BLangRuntimeException.class,
-            expectedExceptionsMessageRegExp = ".*\\{ballerina/lang.map\\}KeyNotFound message=cannot find key 'l'.*")
+            expectedExceptionsMessageRegExp = ".*\\{ballerina/lang.map\\}KeyNotFound \\{\"message\":\"cannot find key" +
+                    " 'l'\"\\}.*")
     public void testFillingReadOnRecordNegativeFieldAccessLvExpr() {
         BRunUtil.invoke(result, "testFillingReadOnRecordNegativeFieldAccessLvExpr");
     }
 
     @Test(expectedExceptions = BLangRuntimeException.class,
-            expectedExceptionsMessageRegExp = ".*\\{ballerina/lang.map\\}KeyNotFound message=cannot find key 'l'.*")
+            expectedExceptionsMessageRegExp = ".*\\{ballerina/lang.map\\}KeyNotFound \\{\"message\":\"cannot find key" +
+                    " 'l'\"\\}\n.*")
     public void testFillingReadOnRecordNegativeMemberAccessLvExpr() {
         BRunUtil.invoke(result, "testFillingReadOnRecordNegativeMemberAccessLvExpr");
     }

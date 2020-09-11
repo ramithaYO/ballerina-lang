@@ -30,7 +30,6 @@ import org.wso2.ballerinalang.compiler.tree.BLangPackage;
 import org.wso2.ballerinalang.compiler.util.CompilerContext;
 import org.wso2.ballerinalang.compiler.util.CompilerOptions;
 import org.wso2.ballerinalang.compiler.util.diagnotic.BLangDiagnosticLogHelper;
-import org.wso2.ballerinalang.util.RepoUtils;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -42,6 +41,7 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.charset.Charset;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -51,9 +51,6 @@ import java.util.Set;
 
 import static org.ballerinalang.compiler.JarResolver.JAR_RESOLVER_KEY;
 import static org.wso2.ballerinalang.compiler.util.ProjectDirConstants.BALLERINA_HOME;
-import static org.wso2.ballerinalang.compiler.util.ProjectDirConstants.BALLERINA_HOME_BRE;
-import static org.wso2.ballerinalang.compiler.util.ProjectDirConstants.BALLERINA_HOME_LIB;
-import static org.wso2.ballerinalang.compiler.util.ProjectDirConstants.BLANG_COMPILED_JAR_EXT;
 
 /**
  * JVM byte code generator from BIR model.
@@ -71,6 +68,7 @@ public class CodeGenerator {
     private CompilerContext compilerContext;
     private boolean skipTests;
     private boolean dumbBIR;
+    private final String dumpBIRFile;
     private boolean skipModuleDependencies;
     private Path ballerinaHome = Paths.get(System.getProperty(BALLERINA_HOME));
 
@@ -86,6 +84,7 @@ public class CodeGenerator {
         this.skipTests = getBooleanValueIfSet(compilerOptions, CompilerOptionName.SKIP_TESTS);
         this.baloGen = getBooleanValueIfSet(compilerOptions, CompilerOptionName.BALO_GENERATION);
         this.dumbBIR = getBooleanValueIfSet(compilerOptions, CompilerOptionName.DUMP_BIR);
+        this.dumpBIRFile = compilerOptions.get(CompilerOptionName.DUMP_BIR_FILE);
         this.skipModuleDependencies = getBooleanValueIfSet(compilerOptions,
                 CompilerOptionName.SKIP_MODULE_DEPENDENCIES);
     }
@@ -109,6 +108,15 @@ public class CodeGenerator {
 
         if (dumbBIR) {
             birEmitter.emit(bLangPackage.symbol.bir);
+        }
+
+        if (dumpBIRFile != null) {
+            try {
+                Files.write(Paths.get(dumpBIRFile),
+                            bLangPackage.symbol.birPackageFile.pkgBirBinaryContent);
+            } catch (IOException e) {
+                throw new BLangCompilerException("BIR file dumping failed", e);
+            }
         }
 
         // find module dependencies path
@@ -160,7 +168,6 @@ public class CodeGenerator {
 
         if (jarResolver != null) {
             moduleDependencies.addAll(jarResolver.nativeDependencies(packageID));
-            moduleDependencies.add(getRuntimeAllJarPath());
         }
 
         return moduleDependencies;
@@ -192,13 +199,6 @@ public class CodeGenerator {
             throw new BLangCompilerException("error reading interop jar file names", e);
         }
         return interopDependencies;
-    }
-
-    private Path getRuntimeAllJarPath() {
-
-        String ballerinaVersion = RepoUtils.getBallerinaPackVersion();
-        String runtimeJarName = "ballerina-rt-" + ballerinaVersion + BLANG_COMPILED_JAR_EXT;
-        return Paths.get(ballerinaHome.toString(), BALLERINA_HOME_BRE, BALLERINA_HOME_LIB, runtimeJarName);
     }
 
     private ClassLoader makeClassLoader(Set<Path> moduleDependencies) {

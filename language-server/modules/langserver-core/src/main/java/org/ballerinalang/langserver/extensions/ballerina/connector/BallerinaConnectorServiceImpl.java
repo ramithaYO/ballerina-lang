@@ -221,7 +221,95 @@ public class BallerinaConnectorServiceImpl implements BallerinaConnectorService 
             }
         }
         BallerinaConnectorResponse response = new BallerinaConnectorResponse(request.getOrg(), request.getModule(),
-                request.getVersion(), request.getName(), request.getDisplayName(), ast, error);
+                request.getVersion(), request.getName(), request.getDisplayName(), ast, error, request.getBeta());
+        return CompletableFuture.supplyAsync(() -> response);
+    }
+
+    @Override
+    public CompletableFuture<BallerinaRecordResponse> record(BallerinaRecordRequest request) {
+        String cacheableKey = getCacheableKey(request.getOrg(), request.getModule(), request.getVersion());
+        LSRecordCache recordCache = LSRecordCache.getInstance(lsContext);
+
+        JsonElement ast = recordCache.getRecordAST(request.getOrg(), request.getModule(),
+                request.getVersion(), request.getName());
+        String error = "";
+        if (ast == null) {
+            try {
+                int versionSeparator = request.getModule().lastIndexOf("_");
+                int modNameSeparator = request.getModule().indexOf("_");
+                String version = request.getModule().substring(versionSeparator + 1);
+                String moduleName = request.getModule().substring(modNameSeparator + 1, versionSeparator);
+                String orgName = request.getModule().substring(0, modNameSeparator);
+                Path baloPath = getBaloPath(orgName, moduleName, version);
+                boolean isExternalModule = baloPath.toString().endsWith(".balo");
+
+                String projectDir = CommonUtil.LS_CONNECTOR_CACHE_DIR.resolve(cacheableKey).toString();
+                if (isExternalModule) {
+                    LSConnectorUtil.extract(baloPath, cacheableKey);
+                } else {
+                    Path destinationRoot = CommonUtil.LS_STDLIB_CACHE_DIR.resolve(cacheableKey).
+                            resolve(ProjectDirConstants.SOURCE_DIR_NAME);
+                    if (!Files.exists(destinationRoot)) {
+                        LSStdLibCacheUtil.extract(baloPath, destinationRoot, moduleName, cacheableKey);
+                    }
+                    projectDir = CommonUtil.LS_STDLIB_CACHE_DIR.resolve(cacheableKey).toString();
+                    moduleName = cacheableKey;
+                }
+                CompilerContext compilerContext = createNewCompilerContext(projectDir);
+                Compiler compiler = LSStdLibCacheUtil.getCompiler(compilerContext);
+                BLangPackage bLangPackage = compiler.compile(moduleName);
+
+                ConnectorNodeVisitor connectorNodeVisitor = new ConnectorNodeVisitor(request.getName());
+                bLangPackage.accept(connectorNodeVisitor);
+
+                VisibleEndpointVisitor visibleEndpointVisitor = new VisibleEndpointVisitor(compilerContext);
+                visibleEndpointVisitor.visit(bLangPackage);
+
+                Map<String, JsonElement> jsonRecords = new HashMap<>();
+                BLangTypeDefinition recordNode = null;
+                JsonElement recordJson = null;
+                for (Map.Entry<String, BLangTypeDefinition> recordEntry
+                        : connectorNodeVisitor.getRecords().entrySet()) {
+                    String key = recordEntry.getKey();
+                    BLangTypeDefinition record = recordEntry.getValue();
+                    JsonElement jsonAST = null;
+                    try {
+                        jsonAST = TextDocumentFormatUtil.generateJSON(record, new HashMap<>(),
+                                visibleEndpointVisitor.getVisibleEPsByNode());
+                    } catch (JSONGenerationException e) {
+                        String msg = "Operation 'ballerinaConnector/record' loading records" +
+                                key + " failed!";
+                        logError(msg, e, null, (Position) null);
+                    }
+                    if (record.getName() != null && record.getName().value.equals(request.getName())) {
+                        recordNode = record;
+                        recordJson = jsonAST;
+                    } else {
+                        jsonRecords.put(key, jsonAST);
+                    }
+                }
+                Gson gson = new Gson();
+                if (recordNode != null) {
+                    if (recordJson instanceof JsonObject) {
+                        JsonElement recordsJson = gson.toJsonTree(jsonRecords);
+                        ((JsonObject) recordJson).add("records", recordsJson);
+                    }
+                    recordCache.addRecordAST(request.getOrg(), request.getModule(),
+                            request.getVersion(), request.getName(), recordJson);
+                }
+
+                ast = recordCache.getRecordAST(request.getOrg(), request.getModule(),
+                        request.getVersion(), request.getName());
+            } catch (Exception e) {
+                String msg = "Operation 'ballerinaConnector/record' for " + cacheableKey + ":" +
+                        request.getName() + " failed!";
+                error = e.getMessage();
+                logError(msg, e, null, (Position) null);
+            }
+
+        }
+        BallerinaRecordResponse response = new BallerinaRecordResponse(request.getOrg(), request.getModule(),
+                request.getVersion(), request.getName(), ast, error, request.getBeta());
         return CompletableFuture.supplyAsync(() -> response);
     }
 

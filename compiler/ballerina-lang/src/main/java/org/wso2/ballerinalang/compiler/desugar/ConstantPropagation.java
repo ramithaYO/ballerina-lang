@@ -31,6 +31,7 @@ import org.wso2.ballerinalang.compiler.semantics.model.symbols.SymTag;
 import org.wso2.ballerinalang.compiler.tree.BLangAnnotation;
 import org.wso2.ballerinalang.compiler.tree.BLangAnnotationAttachment;
 import org.wso2.ballerinalang.compiler.tree.BLangBlockFunctionBody;
+import org.wso2.ballerinalang.compiler.tree.BLangClassDefinition;
 import org.wso2.ballerinalang.compiler.tree.BLangExprFunctionBody;
 import org.wso2.ballerinalang.compiler.tree.BLangExternalFunctionBody;
 import org.wso2.ballerinalang.compiler.tree.BLangFunction;
@@ -49,6 +50,8 @@ import org.wso2.ballerinalang.compiler.tree.clauses.BLangLetClause;
 import org.wso2.ballerinalang.compiler.tree.clauses.BLangLimitClause;
 import org.wso2.ballerinalang.compiler.tree.clauses.BLangOnClause;
 import org.wso2.ballerinalang.compiler.tree.clauses.BLangOnConflictClause;
+import org.wso2.ballerinalang.compiler.tree.clauses.BLangOrderByClause;
+import org.wso2.ballerinalang.compiler.tree.clauses.BLangOrderKey;
 import org.wso2.ballerinalang.compiler.tree.clauses.BLangSelectClause;
 import org.wso2.ballerinalang.compiler.tree.clauses.BLangWhereClause;
 import org.wso2.ballerinalang.compiler.tree.expressions.BLangAnnotAccessExpr;
@@ -207,6 +210,16 @@ public class ConstantPropagation extends BLangNodeVisitor {
     }
 
     @Override
+    public void visit(BLangClassDefinition classDefinition) {
+        rewrite(classDefinition.functions);
+        rewrite(classDefinition.fields);
+        classDefinition.initFunction = rewrite(classDefinition.initFunction);
+        classDefinition.receiver = rewrite(classDefinition.receiver);
+        rewrite(classDefinition.annAttachments);
+        result = classDefinition;
+    }
+
+    @Override
     public void visit(BLangSimpleVariableDef varNode) {
         varNode.var = rewrite(varNode.var);
         result = varNode;
@@ -350,8 +363,6 @@ public class ConstantPropagation extends BLangNodeVisitor {
     public void visit(BLangObjectTypeNode objectTypeNode) {
         rewrite(objectTypeNode.functions);
         rewrite(objectTypeNode.fields);
-        objectTypeNode.initFunction = rewrite(objectTypeNode.initFunction);
-        objectTypeNode.receiver = rewrite(objectTypeNode.receiver);
         result = objectTypeNode;
     }
 
@@ -887,8 +898,21 @@ public class ConstantPropagation extends BLangNodeVisitor {
 
     @Override
     public void visit(BLangOnClause onClause) {
-        onClause.expression = rewrite(onClause.expression);
+        onClause.lhsExpr = rewrite(onClause.lhsExpr);
+        onClause.rhsExpr = rewrite(onClause.rhsExpr);
         result = onClause;
+    }
+
+    @Override
+    public void visit(BLangOrderKey orderKeyClause) {
+        orderKeyClause.expression = rewrite(orderKeyClause.expression);
+        result = orderKeyClause;
+    }
+
+    @Override
+    public void visit(BLangOrderByClause orderByClause) {
+        orderByClause.orderByKeyList.forEach(value -> rewrite((BLangNode) value));
+        result = orderByClause;
     }
 
     @Override
